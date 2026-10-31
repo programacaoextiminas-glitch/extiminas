@@ -319,7 +319,7 @@ function calc(){const m=lerMed();$("calc").innerHTML=m?`${m2(m.area)} m²<div st
 $("med").addEventListener("input",calc);$("qtd").addEventListener("input",calc);
 function setLam(v){lam=v;$("lamN").classList.toggle("on",!v);$("lamS").classList.toggle("on",v==="comum");$("lamO").classList.toggle("on",v==="overlay")}
 $("lamS").onclick=()=>setLam("comum");$("lamO").onclick=()=>setLam("overlay");$("lamN").onclick=()=>setLam(false);
-$("per").onchange=render;
+$("per").onchange=()=>{tudoPeriodo=$("per").value==="tudo";render();if(sb)carregar().catch(e=>console.error(e))};
 
 const comps=r=>r.mat?[r.mat]:[r.sub,r.film].filter(Boolean);
 function partes(r){
@@ -398,22 +398,24 @@ function agradece(ped){
   clearTimeout(okT);okT=setTimeout(()=>o.classList.remove("show"),2600);
 }
 $("ok").onclick=()=>{clearTimeout(okT);$("ok").classList.remove("show")};
-function csv(){
+function csv(lista){
   const dec=(v,d)=>(Math.round(num(v)*10**d)/10**d).toString().replace(".",",");
   const cel=v=>{let s=String(v==null?"":v);if(/^[=+\-@\t\r]/.test(s))s="'"+s;return /[";\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
   const cab=["Data","Pedido","Layout","Setor","Base (chapa)","Material aplicado","Largura","Altura","Unidade","Peças","Área (m²)","Laminado","Motivo","Custo (R$)","Registrado por","Conta"];
-  const lin=rows.slice().sort((a,b)=>(a.data||"").localeCompare(b.data||"")||(a.criado||0)-(b.criado||0)).map(r=>[
+  const lin=(lista||rows).slice().sort((a,b)=>(a.data||"").localeCompare(b.data||"")||(a.criado||0)-(b.criado||0)).map(r=>[
     (r.data||"").split("-").reverse().join("/"),r.ped,r.lay,nomeSetor(r.setor||"sem"),r.sub?nome(r.sub):"",r.film?nome(r.film):(r.mat?nome(r.mat):""),
     r.larg?dec(r.larg,2):"",r.alt?dec(r.alt,2):"",r.un||"",r.qtd||1,dec(r.metros,4),lamTxt(r),r.mot||"",dec(custo(r),2),resp[r.setor]||names[r.por]||"",names[r.por]||""
   ].map(cel).join(";"));
   return "﻿"+[cab.join(";")].concat(lin).join("\r\n");
 }
-$("baixar").onclick=()=>{
-  if(!rows.length){$("bmsg").textContent="Ainda não há registros.";return}
+$("baixar").onclick=async()=>{
   try{
-    const blob=new Blob([csv()],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");
+    $("bmsg").textContent="Preparando…";
+    const todos=sb?await buscar(null):rows;
+    if(!todos.length){$("bmsg").textContent="Ainda não há registros.";return}
+    const blob=new Blob([csv(todos)],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");
     a.href=URL.createObjectURL(blob);a.download="refacoes-extiminas-"+hoje()+".csv";document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(a.href),1500);$("bmsg").textContent="Arquivo baixado ("+rows.length+" registros)."
+    setTimeout(()=>URL.revokeObjectURL(a.href),1500);$("bmsg").textContent="Arquivo baixado ("+todos.length+" registros)."
   }catch(e){$("bmsg").textContent="Não foi possível baixar agora."}
 };
 $("salvaResp").onclick=async()=>{
@@ -453,14 +455,22 @@ const cfg=window.APP_CONFIG||{};
 const configurado=!!(window.supabase&&cfg.url&&cfg.anonKey&&!/COLE_/.test(cfg.url+cfg.anonKey));
 const fromBanco=d=>Object.assign({},d,{lamT:d.lam_t||""});
 const paraBanco=r=>({data:r.data,ped:r.ped,lay:r.lay,setor:r.setor,sub:r.sub,film:r.film,metros:r.metros,larg:r.larg,alt:r.alt,un:r.un,qtd:r.qtd,lam:r.lam,lam_t:r.lamT||"",mot:r.mot,criado:r.criado});
-async function carregar(){
-  if(!sb)return;
+// Para economizar tráfego do Supabase (plano gratuito), só se baixa o período em uso:
+// TV = semana atual; gestor = mês atual (ou tudo, se escolher "Todo o período").
+// A cópia de segurança (CSV) sempre busca o histórico completo.
+let tudoPeriodo=false;
+async function buscar(desde){
   const tudo=[];
   for(let de=0;;de+=1000){
-    const{data,error}=await sb.from("refacoes").select("*").order("criado",{ascending:false}).range(de,de+999);
+    let q=sb.from("refacoes").select("*");if(desde)q=q.gte("data",desde);
+    const{data,error}=await q.order("criado",{ascending:false}).range(de,de+999);
     if(error)throw error;tudo.push(...data);if(data.length<1000)break;
   }
-  rows=tudo.map(fromBanco);
+  return tudo.map(fromBanco);
+}
+async function carregar(){
+  if(!sb)return;
+  rows=await buscar(TV?semana()[0]:(tudoPeriodo?null:hoje().slice(0,7)+"-01"));
   if(TV)renderTV();else{render();loadNames()}
 }
 let cargaT=null;
