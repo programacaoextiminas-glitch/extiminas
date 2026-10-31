@@ -149,7 +149,12 @@ details summary{cursor:pointer;font-weight:600}
 .note{font-size:12px;color:var(--mut);margin-top:8px}
 #tvview{display:none}
 body.tv #tvview{display:block}
-body.tv header,body.tv .wrap>.card:not(#login),body.tv #painel{display:none}
+body.tv header,body.tv .wrap>.card:not(#login),body.tv #painel,body.tv #fcard,body.tv #abas{display:none}
+#abas{display:flex;gap:4px;margin:-6px 0 18px;border-bottom:1px solid var(--line);overflow-x:auto}
+.aba{background:none;border:0;border-bottom:3px solid transparent;padding:10px 16px;margin-bottom:-1px;font:inherit;font-weight:600;color:var(--mut);cursor:pointer;white-space:nowrap}
+.aba:hover{color:var(--ink)}
+.aba.on{color:var(--red);border-bottom-color:var(--red)}
+.aba:focus-visible{outline:2px solid var(--red);outline-offset:-2px;border-radius:6px}
 body.tv #login{max-width:520px;margin:40px auto}
 body.tv header{display:flex}
 body.tv .role,body.tv #sair{display:none}
@@ -165,7 +170,12 @@ body.tv h2{font-size:clamp(13px,1.3vw,18px)}
 </head>
 <body>
 <div class="wrap">
-<header><div class="logo"></div><div><h1><span>Extiminas</span> · Controle de Refação</h1><div class="sub">Registro de perdas de insumos da comunicação visual</div></div><div class="role" id="role"></div><button class="ghost" id="sair" type="button" hidden>Sair</button></header>
+<header><div class="logo"></div><div><h1><span>Extiminas</span></h1><div class="sub">Sistema interno · comunicação visual</div></div><div class="role" id="role"></div><button class="ghost" id="sair" type="button" hidden>Sair</button></header>
+<nav id="abas" aria-label="Funções do sistema" hidden>
+<button type="button" class="aba on" data-aba="refacao" aria-current="page">Refação</button>
+<!-- Novas funções: copie a linha acima, troque o nome e o data-aba (ex.: data-aba="estoque"),
+     e crie uma <section id="aba-estoque" class="aba-pg" hidden> com o conteúdo. -->
+</nav>
 
 <div class="card" id="login" hidden>
 <h2>Entrar</h2>
@@ -174,6 +184,7 @@ body.tv h2{font-size:clamp(13px,1.3vw,18px)}
 <div id="lmsg" class="note" role="alert"></div>
 </div>
 
+<section id="aba-refacao" class="aba-pg">
 <div class="card" id="fcard" hidden>
 <div class="fhead"><h2 class="ftitle"><button type="button" id="fold" class="fold" aria-expanded="true" aria-controls="fbody" hidden><span class="chev" aria-hidden="true">▾</span><span class="sr">Mostrar ou esconder o registro</span></button>Novo registro de refação</h2><div class="tsize" role="group" aria-label="Tamanho do texto"><span>Tamanho do texto:</span><button type="button" data-t="1" aria-label="Texto normal">A</button><button type="button" data-t="2" aria-label="Texto grande">A</button><button type="button" data-t="3" aria-label="Texto muito grande">A</button></div></div>
 
@@ -246,6 +257,7 @@ body.tv h2{font-size:clamp(13px,1.3vw,18px)}
 </details>
 </div>
 </div>
+</section>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -458,6 +470,16 @@ async function carregarConfig(){
   (data||[]).forEach(c=>{if(c.chave==="precos"){prices=c.valor||{};fillPrices()}if(c.chave==="responsaveis"){resp=c.valor||{};fillResp()}});
   render();
 }
+// Abas do sistema: cada botão .aba[data-aba="x"] mostra a seção #aba-x.
+function abrirAba(id){
+  const bt=[...document.querySelectorAll(".aba")],pg=[...document.querySelectorAll(".aba-pg")];
+  if(!pg.some(p=>p.id==="aba-"+id))id="refacao";
+  bt.forEach(b=>{const on=b.dataset.aba===id;b.classList.toggle("on",on);if(on)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current")});
+  pg.forEach(p=>{p.hidden=p.id!=="aba-"+id});
+}
+document.querySelectorAll(".aba").forEach(b=>b.onclick=()=>{abrirAba(b.dataset.aba);history.replaceState(null,"","#"+b.dataset.aba)});
+window.addEventListener("hashchange",()=>{if(!TV)abrirAba(location.hash.slice(1))});
+function mostraAbas(){if(TV)return;$("abas").hidden=false;abrirAba(location.hash.slice(1))}
 function telaLogin(v){$("login").hidden=!v;if(v)setTimeout(()=>$("em").focus(),50)}
 async function entrar(){
   const email=$("em").value.trim(),password=$("pw").value;$("lmsg").textContent="";
@@ -475,7 +497,7 @@ $("sair").onclick=async()=>{if(sb)await sb.auth.signOut();location.reload()};
 (async()=>{
   if(!configurado){
     // Sem Supabase configurado: modo de teste local (nada é guardado ao fechar).
-    gestor=true;papel();$("fcard").hidden=false;$("sair").hidden=true;
+    gestor=true;papel();mostraAbas();$("fcard").hidden=false;$("sair").hidden=true;
     $("msg").textContent="Modo de teste: Supabase não configurado (veja config.js). Os registros não serão guardados.";
     render();return;
   }
@@ -486,7 +508,7 @@ $("sair").onclick=async()=>{if(sb)await sb.auth.signOut();location.reload()};
   let papelBanco="equipe";
   try{const{data}=await sb.from("perfis").select("papel,nome").eq("id",meId).maybeSingle();if(data){papelBanco=data.papel;names[meId]=data.nome}}catch(e){console.error(e)}
   gestor=papelBanco==="gestor";
-  papel();
+  papel();mostraAbas();
   if(TV){
     if(papelBanco!=="gestor"&&papelBanco!=="tv"){$("tvview").innerHTML='<div class="empty">Sem acesso. Entre com a conta da TV.</div>';return}
     await carregar().catch(e=>{console.error(e);$("tvview").innerHTML='<div class="empty">Não foi possível carregar os dados.</div>'});
