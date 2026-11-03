@@ -181,6 +181,8 @@ body.tv h2{font-size:clamp(13px,1.3vw,18px)}
 .var.dn{color:#1a7f4b}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .var.dn{color:#4cc38a}}
 .mc .l i{font-style:normal}
+#relSec.min .fold .chev{transform:rotate(-90deg)}
+#relSec.min .rctl,#relSec.min .rnote,#relSec.min #relCorpo{display:none!important}
 .cgx{min-height:170px}
 .cgx .mc{cursor:default}
 .rtit{font-size:22px;font-weight:700;letter-spacing:-.01em}
@@ -303,9 +305,9 @@ body.tv h2{font-size:clamp(13px,1.3vw,18px)}
 
 <div id="relSec">
 <div class="card noprint">
-<div class="row" style="margin:0"><h2 style="margin:0">Relatório mensal</h2>
-<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select id="relMes" aria-label="Mês do relatório" style="width:auto"></select><button class="btn" id="relPrint" type="button">Imprimir / salvar em PDF</button><button class="ghost" id="relCsv" type="button">Baixar planilha do mês</button></div></div>
-<p class="note" style="margin:8px 0 0">Resumo pronto para apresentar. Para gerar o PDF, clique em "Imprimir" e escolha "Salvar como PDF".</p>
+<div class="row" style="margin:0"><h2 style="margin:0;display:flex;align-items:center"><button type="button" id="relFold" class="fold" aria-expanded="false" aria-controls="relCorpo"><span class="chev" aria-hidden="true">▾</span><span class="sr">Mostrar ou esconder o relatório mensal</span></button>Relatório mensal</h2>
+<div class="rctl" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select id="relMes" aria-label="Mês do relatório" style="width:auto"></select><button class="btn" id="relPrint" type="button">Imprimir / salvar em PDF</button><button class="ghost" id="relCsv" type="button">Baixar planilha do mês</button></div></div>
+<p class="note rnote" style="margin:8px 0 0">Resumo pronto para apresentar. Para gerar o PDF, clique em "Imprimir" e escolha "Salvar como PDF".</p>
 </div>
 <div id="relCorpo"></div>
 </div>
@@ -573,6 +575,10 @@ async function renderRel(){
   relLista=lista;box.innerHTML=htmlRel(k,lista);
 }
 $("relMes").onchange=renderRel;
+// Minimizar/expandir o relatório (a escolha fica guardada neste navegador; começa minimizado).
+function relDobra(min){$("relSec").classList.toggle("min",min);$("relFold").setAttribute("aria-expanded",String(!min));$("relFold").title=min?"Mostrar relatório":"Esconder relatório";try{localStorage.setItem("rmin",min?"1":"0")}catch(e){}}
+$("relFold").onclick=()=>relDobra(!$("relSec").classList.contains("min"));
+{let v="1";try{v=localStorage.getItem("rmin")??"1"}catch(e){}relDobra(v==="1")}
 // Ao imprimir, só o relatório sai na página (o resto do painel é escondido durante a impressão).
 $("relPrint").onclick=()=>{document.body.classList.add("pr-rel");window.print()};
 window.addEventListener("afterprint",()=>document.body.classList.remove("pr-rel"));
