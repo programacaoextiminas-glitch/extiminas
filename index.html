@@ -166,6 +166,22 @@ body.tv h2{font-size:clamp(13px,1.3vw,18px)}
 .tvt{font-size:clamp(28px,4vw,56px);font-weight:700;letter-spacing:-.02em}
 .tvt span{color:var(--red)}
 .tvb{font-size:clamp(28px,4vw,56px)!important}
+#cgraf{display:flex;gap:6px;align-items:flex-end;min-height:230px;margin:12px 0 10px}
+.mc{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;background:none;border:0;padding:2px 0 0;cursor:pointer;font:inherit;color:var(--ink)}
+.mc .v{font-size:11px;color:var(--mut);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.mc .b{display:block;width:100%;max-width:46px;border-radius:4px 4px 0 0;background:color-mix(in srgb,var(--red) 38%,var(--card));transition:background .15s}
+.mc:hover .b{background:color-mix(in srgb,var(--red) 70%,var(--card))}
+.mc.on .b{background:var(--red)}
+.mc .l{display:block;width:100%;text-align:center;font-size:11px;color:var(--mut);padding-top:5px;border-top:1px solid var(--line)}
+.mc.on .l{color:var(--red);font-weight:700}
+.mc:focus-visible{outline:2px solid var(--red);outline-offset:1px;border-radius:6px}
+#cdet h3{font-size:16px;margin:18px 0 4px}
+.var{font-weight:700;white-space:nowrap}
+.var.up{color:var(--red)}
+.var.dn{color:#1a7f4b}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .var.dn{color:#4cc38a}}
+.mc .l i{font-style:normal}
+@media (max-width:560px){#cgraf{gap:3px}.mc .l{font-size:10px}.mc .l i{display:none}.mc:not(.on) .v{display:none}.mc.on .v{overflow:visible;max-width:none}}
 </style>
 </head>
 <body>
@@ -225,6 +241,13 @@ body.tv h2{font-size:clamp(13px,1.3vw,18px)}
 <div class="row"><h2 style="margin:0">Resumo</h2>
 <select id="per"><option value="mes">Este mês</option><option value="tudo">Todo o período</option></select></div>
 <div class="kpis" id="kpis"></div>
+
+<div class="card" id="comp">
+<div class="row"><h2 style="margin:0">Comparativo mês a mês</h2><select id="cmet" aria-label="O que mostrar no gráfico" style="width:auto"><option value="m">Área perdida (m²)</option><option value="c">Custo estimado (R$)</option><option value="n">Nº de refações</option></select></div>
+<div id="cgraf" role="group" aria-label="Últimos 12 meses"></div>
+<p class="note" style="margin:0">Últimos 12 meses. Clique em um mês para ver as refações dele; clique de novo para fechar. Passe o mouse para ver a variação em relação ao mês anterior.</p>
+<div id="cdet"></div>
+</div>
 
 <div class="card"><h2>Perda por setor</h2><div id="setores"></div><p class="note">A faixa colorida mostra a participação de cada setor na área perdida. Passe o mouse para ver os valores. Os cartões estão em ordem do setor que mais perdeu.</p></div>
 
@@ -333,6 +356,11 @@ function filtrado(){
   if($("per").value==="tudo")return rows;
   const mes=hoje().slice(0,7);return rows.filter(r=>(r.data||"").slice(0,7)===mes);
 }
+function linhaHist(r,temPreco,del){
+    const d=(r.data||"").split("-").reverse().join("/");
+    const det=partes(r).map(p=>esc(nome(p[0]))+" "+brl(p[1])).join(" · ");
+    return `<tr><td>${esc(d)}</td><td><b>${esc(r.ped||"—")}</b></td><td>${esc(r.lay||"—")}</td><td>${esc(nomeSetor(r.setor||"sem"))}</td><td>${comps(r).map(id=>esc(nome(id))).join(" + ")||"—"}</td><td>${m2(r.metros)}${r.larg?`<small>${m2(r.larg)} × ${m2(r.alt)} ${esc(r.un||"")}${r.qtd>1?" × "+r.qtd+" pç":""}</small>`:""}</td><td><span class="tag ${r.lam?"sim":""}">${lamTxt(r)}</span></td><td>${esc(r.mot||"—")}</td><td>${temPreco?brl(custo(r))+"<small>"+det+"</small>":"—"}</td><td>${quem(r)}</td>${del?`<td><button class="ghost ${confirmId===r.id?"warn":""}" data-del="${esc(r.id)}">${confirmId===r.id?"Confirmar?":"Excluir"}</button></td>`:""}</tr>`;
+}
 function render(){
   if(!gestor)return;
   const f=filtrado().slice().sort((a,b)=>(b.data||"").localeCompare(a.data||"")||(b.criado||0)-(a.criado||0));
@@ -354,16 +382,86 @@ function render(){
     `<div class="strip" role="img" aria-label="Participação de cada setor na área perdida">${ps.map(([id,v])=>`<i style="flex:${v.m||0.0001};background:${corS(id)}" title="${esc(nomeSetor(id))}: ${m2(v.m)} m² (${pct(v.m)}%)"></i>`).join("")}</div>`+
     `<div class="stiles">${ps.map(([id,v],k)=>`<div class="stile${k===0&&ps.length>1?" top":""}" style="--c:${corS(id)}" title="${esc(nomeSetor(id))}: ${m2(v.m)} m², ${pct(v.m)}% do total${temPreco?", "+brl(v.c):""}, ${nref(v.n)}"><div class="nm">${esc(nomeSetor(id))}<span class="rk">${k+1}º</span></div><div class="big">${m2(v.m)} <small>m²</small></div><div class="pct"><b>${pct(v.m)}%</b> da perda total</div><div class="mini"><div style="width:${maxS?v.m/maxS*100:0}%"></div></div><div class="ft"><span>${nref(v.n)}</span><span>${temPreco?brl(v.c):""}</span></div></div>`).join("")}</div>`
     :'<div class="empty">Nenhuma perda registrada neste período.</div>';
-  $("hist").innerHTML=f.length?f.map(r=>{
-    const d=(r.data||"").split("-").reverse().join("/");
-    const det=partes(r).map(p=>esc(nome(p[0]))+" "+brl(p[1])).join(" · ");
-    return `<tr><td>${esc(d)}</td><td><b>${esc(r.ped||"—")}</b></td><td>${esc(r.lay||"—")}</td><td>${esc(nomeSetor(r.setor||"sem"))}</td><td>${comps(r).map(id=>esc(nome(id))).join(" + ")||"—"}</td><td>${m2(r.metros)}${r.larg?`<small>${m2(r.larg)} × ${m2(r.alt)} ${esc(r.un||"")}${r.qtd>1?" × "+r.qtd+" pç":""}</small>`:""}</td><td><span class="tag ${r.lam?"sim":""}">${lamTxt(r)}</span></td><td>${esc(r.mot||"—")}</td><td>${temPreco?brl(custo(r))+"<small>"+det+"</small>":"—"}</td><td>${quem(r)}</td><td><button class="ghost ${confirmId===r.id?"warn":""}" data-del="${esc(r.id)}">${confirmId===r.id?"Confirmar?":"Excluir"}</button></td></tr>`}).join(""):'<tr><td colspan="11" class="empty">Sem registros.</td></tr>';
+  $("hist").innerHTML=f.length?f.map(r=>linhaHist(r,temPreco,true)).join(""):'<tr><td colspan="11" class="empty">Sem registros.</td></tr>';
+  renderComp();
 }
+// ---- Comparativo mês a mês ----
+const MESES=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+const mesCurto=k=>MESES[+k.slice(5,7)-1].slice(0,3)+"/"+k.slice(2,4);
+const mesLongo=k=>MESES[+k.slice(5,7)-1]+" de "+k.slice(0,4);
+function ultimosMeses(n){const d=new Date(),a=[];for(let i=n-1;i>=0;i--){const x=new Date(d.getFullYear(),d.getMonth()-i,1);a.push(x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0"))}return a}
+const proxMes=k=>{const y=+k.slice(0,4),m=+k.slice(5,7);return m===12?(y+1)+"-01":y+"-"+String(m+1).padStart(2,"0")};
+let histMes=[],mesesOk=false,mesSel=null,detCache={},mesT=null;
+// Meses anteriores ao atual são baixados uma vez (só as colunas necessárias) e ficam em memória.
+async function carregarMeses(){
+  if(!sb||!gestor)return;
+  const a=ultimosMeses(12)[0]+"-01",b=hoje().slice(0,7)+"-01",tudo=[];
+  for(let de=0;;de+=1000){
+    const{data,error}=await sb.from("refacoes").select("id,data,metros,sub,film,mat,lam,lam_t,setor").gte("data",a).lt("data",b).order("data").order("id").range(de,de+999);
+    if(error)throw error;tudo.push(...data);if(data.length<1000)break;
+  }
+  histMes=tudo.map(fromBanco);mesesOk=true;renderComp();
+}
+async function buscarMes(k){
+  const tudo=[];
+  for(let de=0;;de+=1000){
+    const{data,error}=await sb.from("refacoes").select("*").gte("data",k+"-01").lt("data",proxMes(k)+"-01").order("data",{ascending:false}).order("id").range(de,de+999);
+    if(error)throw error;tudo.push(...data);if(data.length<1000)break;
+  }
+  return tudo.map(fromBanco);
+}
+function dadosMes(){
+  const ms=ultimosMeses(12),cur=hoje().slice(0,7),by={};ms.forEach(k=>by[k]={m:0,c:0,n:0});
+  const add=r=>{const o=by[(r.data||"").slice(0,7)];if(!o)return;o.m+=num(r.metros);o.c+=custo(r);o.n++};
+  if(!sb)rows.forEach(add);
+  else{histMes.forEach(add);rows.filter(r=>(r.data||"").slice(0,7)===cur).forEach(add)}
+  return ms.map(k=>[k,by[k]]);
+}
+const pctVar=(v,p)=>p>0?(v-p)/p*100:null;
+const varTxt=x=>x==null?"":`<span class="var ${x>0?"up":x<0?"dn":""}">${x>0?"▲":x<0?"▼":"="} ${Math.abs(Math.round(x))}%</span>`;
+function renderComp(){
+  if(!gestor||!$("cgraf"))return;
+  const met=$("cmet").value,temPreco=Object.values(prices).some(v=>num(v)>0),cur=hoje().slice(0,7);
+  const d=dadosMes(),max=Math.max(0,...d.map(x=>x[1][met]));
+  const fmt=v=>met==="m"?m2(v):met==="c"?"R$ "+Math.round(v).toLocaleString("pt-BR"):String(v);
+  if(met==="c"&&!temPreco)$("cgraf").innerHTML='<div class="empty" style="width:100%">Defina os preços (mais abaixo, em "Preços para cálculo do custo") para ver o custo por mês.</div>';
+  else if(sb&&!mesesOk)$("cgraf").innerHTML='<div class="empty" style="width:100%">Carregando…</div>';
+  else $("cgraf").innerHTML=d.map(([k,o],i)=>{
+    const v=o[met],h=max&&v>0?Math.max(3,Math.round(v/max*170)):0,vr=i?pctVar(v,d[i-1][1][met]):null;
+    const tip=mesLongo(k)+(k===cur?" (em andamento)":"")+": "+m2(o.m)+" m², "+o.n+" refaç"+(o.n===1?"ão":"ões")+(temPreco?", "+brl(o.c):"")+(vr==null?"":" · "+(vr>0?"+":"")+Math.round(vr)+"% vs mês anterior");
+    return `<button type="button" class="mc${k===mesSel?" on":""}" data-mes="${k}" title="${esc(tip)}" aria-label="${esc(tip)}. Clique para ver as refações." aria-pressed="${k===mesSel}"><span class="v">${fmt(v)}</span><span class="b" style="height:${h}px"></span><span class="l">${mesCurto(k).split("/")[0]}<i>/${k.slice(2,4)}</i></span></button>`}).join("");
+  renderDet(d);
+}
+async function renderDet(d){
+  const box=$("cdet");
+  if(!mesSel){box.innerHTML="";return}
+  const k=mesSel,cur=hoje().slice(0,7);let lista;
+  if(k===cur||!sb)lista=rows.filter(r=>(r.data||"").slice(0,7)===k);
+  else if(detCache[k])lista=detCache[k];
+  else{
+    box.innerHTML='<div class="empty">Carregando refações…</div>';
+    try{lista=detCache[k]=await buscarMes(k)}catch(e){console.error(e);if(mesSel===k)box.innerHTML='<div class="empty">Não foi possível carregar este mês.</div>';return}
+    if(mesSel!==k)return;
+  }
+  lista=lista.slice().sort((a,b)=>(b.data||"").localeCompare(a.data||"")||(b.criado||0)-(a.criado||0));
+  const met=$("cmet").value,i=d.findIndex(x=>x[0]===k),o=d[i]?d[i][1]:{m:0,c:0,n:0},pv=i>0?d[i-1][1]:null;
+  const temPreco=Object.values(prices).some(v=>num(v)>0),vr=pv?pctVar(o[met],pv[met]):null;
+  const nref=n=>n+" refaç"+(n===1?"ão":"ões"),rot={m:"na área",c:"no custo",n:"no número de refações"}[met];
+  box.innerHTML=`<h3>Refações de ${esc(mesLongo(k))}${k===cur?" (em andamento)":""}</h3>`+
+    `<p class="note" style="margin:0 0 10px">${nref(lista.length)} · ${m2(lista.reduce((s,r)=>s+num(r.metros),0))} m²${temPreco?" · "+brl(lista.reduce((s,r)=>s+custo(r),0)):""}${vr==null?"":" · "+varTxt(vr)+" "+rot+" em relação a "+esc(MESES[+d[i-1][0].slice(5,7)-1])}</p>`+
+    `<div class="scroll"><table><thead><tr><th>Data</th><th>Pedido</th><th>Layout</th><th>Setor</th><th>Material</th><th>m²</th><th>Laminado</th><th>Motivo</th><th>Custo</th><th>Registrado por</th></tr></thead><tbody>${lista.length?lista.map(r=>linhaHist(r,temPreco,false)).join(""):'<tr><td colspan="10" class="empty">Nenhuma refação neste mês.</td></tr>'}</tbody></table></div>`;
+}
+$("cmet").onchange=renderComp;
+$("cgraf").onclick=e=>{
+  const b=e.target.closest("[data-mes]");if(!b)return;
+  mesSel=mesSel===b.dataset.mes?null:b.dataset.mes;renderComp();
+  if(mesSel)setTimeout(()=>$("cdet").scrollIntoView({behavior:"smooth",block:"nearest"}),50);
+};
 $("hist").onclick=async e=>{
   const id=e.target.dataset&&e.target.dataset.del;if(!id)return;
   if(confirmId!==id){confirmId=id;render();setTimeout(()=>{if(confirmId===id){confirmId=null;render()}},4000);return}
   confirmId=null;
-  try{if(sb){const{error}=await sb.from("refacoes").delete().eq("id",id);if(error)throw error}rows=rows.filter(r=>r.id!==id);render()}catch(err){$("msg").className="";$("msg").textContent="Não foi possível excluir."}
+  try{if(sb){const{error}=await sb.from("refacoes").delete().eq("id",id);if(error)throw error}rows=rows.filter(r=>r.id!==id);histMes=histMes.filter(r=>r.id!==id);detCache={};render()}catch(err){$("msg").className="";$("msg").textContent="Não foi possível excluir."}
 };
 $("salvar").onclick=async()=>{
   const met=area();const ped=$("ped").value.trim();
@@ -474,7 +572,12 @@ async function carregar(){
   if(TV)renderTV();else{render();loadNames()}
 }
 let cargaT=null;
-function agendaCarga(){clearTimeout(cargaT);cargaT=setTimeout(()=>carregar().catch(e=>console.error(e)),400)}
+function agendaCarga(p){
+  clearTimeout(cargaT);cargaT=setTimeout(()=>carregar().catch(e=>console.error(e)),400);
+  // registro com data de outro mês (lançamento retroativo): atualiza também o comparativo
+  const dt=(p&&((p.new&&p.new.data)||(p.old&&p.old.data)))||"";
+  if(gestor&&dt&&dt.slice(0,7)!==hoje().slice(0,7)){detCache={};clearTimeout(mesT);mesT=setTimeout(()=>carregarMeses().catch(e=>console.error(e)),3000)}
+}
 async function carregarConfig(){
   const{data,error}=await sb.from("config").select("chave,valor");if(error)throw error;
   (data||[]).forEach(c=>{if(c.chave==="precos"){prices=c.valor||{};fillPrices()}if(c.chave==="responsaveis"){resp=c.valor||{};fillResp()}});
@@ -529,6 +632,7 @@ $("sair").onclick=async()=>{if(sb)await sb.auth.signOut();location.reload()};
   $("fcard").hidden=false;
   if(gestor){
     $("bk").hidden=false;
+    carregarMeses().catch(e=>console.error(e));
     await Promise.all([carregar(),carregarConfig()]).catch(e=>console.error(e));
     sb.channel("rf-gestor").on("postgres_changes",{event:"*",schema:"public",table:"refacoes"},agendaCarga).subscribe();
   }
