@@ -194,6 +194,7 @@ body.tv h2{font-size:clamp(13px,1.3vw,18px)}
 @media print{
   :root:root:root{--bg:#fff;--card:#fff;--ink:#000;--mut:#555;--line:#ccc;--soft:#fbeaed;--red:#C8102E;color-scheme:light}
   header,#abas,.noprint,#ok,#msg{display:none!important}
+  body.pr-rel #fcard,body.pr-rel #tvview,body.pr-rel #painel>*:not(#relSec),body.pr-rel #login{display:none!important}
   body{background:#fff}.wrap{max-width:none;padding:0}
   .card,.kpi{break-inside:avoid;box-shadow:none}
   .scroll{overflow:visible!important}
@@ -209,7 +210,6 @@ body.tv h2{font-size:clamp(13px,1.3vw,18px)}
 <header><div class="logo"></div><div><h1><span>Extiminas</span></h1><div class="sub">Sistema interno · comunicação visual</div></div><div class="role" id="role"></div><button class="ghost" id="sair" type="button" hidden>Sair</button></header>
 <nav id="abas" aria-label="Funções do sistema" hidden>
 <button type="button" class="aba on" data-aba="refacao" aria-current="page">Refação</button>
-<button type="button" class="aba" data-aba="relatorio" id="abaRel" hidden>Relatório mensal</button>
 <!-- Novas funções: copie a linha acima, troque o nome e o data-aba (ex.: data-aba="estoque"),
      e crie uma <section id="aba-estoque" class="aba-pg" hidden> com o conteúdo. -->
 </nav>
@@ -300,17 +300,18 @@ body.tv h2{font-size:clamp(13px,1.3vw,18px)}
 <div style="margin-top:12px"><button class="btn" id="salvaResp" type="button">Salvar responsáveis</button> <span id="rmsg" class="note"></span></div>
 </details>
 </div>
-</div>
-</section>
 
-<section id="aba-relatorio" class="aba-pg" hidden>
+<div id="relSec">
 <div class="card noprint">
 <div class="row" style="margin:0"><h2 style="margin:0">Relatório mensal</h2>
 <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select id="relMes" aria-label="Mês do relatório" style="width:auto"></select><button class="btn" id="relPrint" type="button">Imprimir / salvar em PDF</button><button class="ghost" id="relCsv" type="button">Baixar planilha do mês</button></div></div>
 <p class="note" style="margin:8px 0 0">Resumo pronto para apresentar. Para gerar o PDF, clique em "Imprimir" e escolha "Salvar como PDF".</p>
 </div>
 <div id="relCorpo"></div>
+</div>
+</div>
 </section>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -461,7 +462,7 @@ function renderComp(){
     const tip=mesLongo(k)+(k===cur?" (em andamento)":"")+": "+m2(o.m)+" m², "+o.n+" refaç"+(o.n===1?"ão":"ões")+(temPreco?", "+brl(o.c):"")+(vr==null?"":" · "+(vr>0?"+":"")+Math.round(vr)+"% vs mês anterior");
     return `<button type="button" class="mc${k===mesSel?" on":""}" data-mes="${k}" title="${esc(tip)}" aria-label="${esc(tip)}. Clique para ver as refações." aria-pressed="${k===mesSel}"><span class="v">${fmt(v)}</span><span class="b" style="height:${h}px"></span><span class="l">${mesCurto(k).split("/")[0]}<i>/${k.slice(2,4)}</i></span></button>`}).join("");
   renderDet(d);
-  if(!$("aba-relatorio").hidden)renderRel();
+  renderRel();
 }
 async function renderDet(d){
   const box=$("cdet");
@@ -572,7 +573,9 @@ async function renderRel(){
   relLista=lista;box.innerHTML=htmlRel(k,lista);
 }
 $("relMes").onchange=renderRel;
-$("relPrint").onclick=()=>window.print();
+// Ao imprimir, só o relatório sai na página (o resto do painel é escondido durante a impressão).
+$("relPrint").onclick=()=>{document.body.classList.add("pr-rel");window.print()};
+window.addEventListener("afterprint",()=>document.body.classList.remove("pr-rel"));
 $("relCsv").onclick=()=>{
   if(!relLista.length)return;
   const blob=new Blob([csv(relLista)],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");
@@ -670,7 +673,7 @@ function papel(){
   if(gestor){$("fold").hidden=false;let v="1";try{v=localStorage.getItem("fmin")??"1"}catch(e){}dobra(v==="1")}else{$("fold").hidden=true;$("fcard").classList.remove("min")}
   $("role").textContent=gestor?"Gestor":"Usuário";$("role").className="role"+(gestor?" g":"");
   $("painel").hidden=!gestor;
-  $("abaRel").hidden=!gestor;if(gestor&&!$("relMes").options.length)iniciaRel();
+  if(gestor&&!$("relMes").options.length)iniciaRel();
 }
 const cfg=window.APP_CONFIG||{};
 const configurado=!!(window.supabase&&cfg.url&&cfg.anonKey&&!/COLE_/.test(cfg.url+cfg.anonKey));
@@ -709,10 +712,9 @@ async function carregarConfig(){
 // Abas do sistema: cada botão .aba[data-aba="x"] mostra a seção #aba-x.
 function abrirAba(id){
   const bt=[...document.querySelectorAll(".aba")],pg=[...document.querySelectorAll(".aba-pg")];
-  if(!pg.some(p=>p.id==="aba-"+id)||(id==="relatorio"&&!gestor))id="refacao";
+  if(!pg.some(p=>p.id==="aba-"+id))id="refacao";
   bt.forEach(b=>{const on=b.dataset.aba===id;b.classList.toggle("on",on);if(on)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current")});
   pg.forEach(p=>{p.hidden=p.id!=="aba-"+id});
-  if(id==="relatorio")renderRel();
 }
 document.querySelectorAll(".aba").forEach(b=>b.onclick=()=>{abrirAba(b.dataset.aba);history.replaceState(null,"","#"+b.dataset.aba)});
 window.addEventListener("hashchange",()=>{if(!TV)abrirAba(location.hash.slice(1))});
