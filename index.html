@@ -166,7 +166,7 @@ body.tv h2{font-size:clamp(13px,1.3vw,18px)}
 .tvt{font-size:clamp(28px,4vw,56px);font-weight:700;letter-spacing:-.02em}
 .tvt span{color:var(--red)}
 .tvb{font-size:clamp(28px,4vw,56px)!important}
-#cgraf{display:flex;gap:6px;align-items:flex-end;min-height:230px;margin:12px 0 10px}
+#cgraf,.cgx{display:flex;gap:6px;align-items:flex-end;min-height:230px;margin:12px 0 10px}
 .mc{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;background:none;border:0;padding:2px 0 0;cursor:pointer;font:inherit;color:var(--ink)}
 .mc .v{font-size:11px;color:var(--mut);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .mc .b{display:block;width:100%;max-width:46px;border-radius:4px 4px 0 0;background:color-mix(in srgb,var(--red) 38%,var(--card));transition:background .15s}
@@ -181,6 +181,26 @@ body.tv h2{font-size:clamp(13px,1.3vw,18px)}
 .var.dn{color:#1a7f4b}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .var.dn{color:#4cc38a}}
 .mc .l i{font-style:normal}
+.cgx{min-height:170px}
+.cgx .mc{cursor:default}
+.rtit{font-size:22px;font-weight:700;letter-spacing:-.01em}
+.rtit span{color:var(--red)}
+.rsum{margin:0;padding-left:20px}
+.rsum li{margin:6px 0}
+.al{list-style:none;margin:0;padding:0}
+.al li{margin:8px 0;padding:8px 12px;border-left:4px solid var(--red);background:var(--soft);border-radius:0 8px 8px 0}
+.ok-msg{color:var(--mut);margin:0}
+.tag.alert{background:var(--soft);color:var(--red);font-weight:600}
+@media print{
+  :root:root:root{--bg:#fff;--card:#fff;--ink:#000;--mut:#555;--line:#ccc;--soft:#fbeaed;--red:#C8102E;color-scheme:light}
+  header,#abas,.noprint,#ok,#msg{display:none!important}
+  body{background:#fff}.wrap{max-width:none;padding:0}
+  .card,.kpi{break-inside:avoid;box-shadow:none}
+  .scroll{overflow:visible!important}
+  table{width:100%;min-width:0!important;font-size:11px}th,td{padding:6px 4px!important}
+  .tag{white-space:normal}
+  .kpi.main,.al li,.fill,.track,.mc .b{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 @media (max-width:560px){#cgraf{gap:3px}.mc .l{font-size:10px}.mc .l i{display:none}.mc:not(.on) .v{display:none}.mc.on .v{overflow:visible;max-width:none}}
 </style>
 </head>
@@ -189,6 +209,7 @@ body.tv h2{font-size:clamp(13px,1.3vw,18px)}
 <header><div class="logo"></div><div><h1><span>Extiminas</span></h1><div class="sub">Sistema interno · comunicação visual</div></div><div class="role" id="role"></div><button class="ghost" id="sair" type="button" hidden>Sair</button></header>
 <nav id="abas" aria-label="Funções do sistema" hidden>
 <button type="button" class="aba on" data-aba="refacao" aria-current="page">Refação</button>
+<button type="button" class="aba" data-aba="relatorio" id="abaRel" hidden>Relatório mensal</button>
 <!-- Novas funções: copie a linha acima, troque o nome e o data-aba (ex.: data-aba="estoque"),
      e crie uma <section id="aba-estoque" class="aba-pg" hidden> com o conteúdo. -->
 </nav>
@@ -280,6 +301,15 @@ body.tv h2{font-size:clamp(13px,1.3vw,18px)}
 </details>
 </div>
 </div>
+</section>
+
+<section id="aba-relatorio" class="aba-pg" hidden>
+<div class="card noprint">
+<div class="row" style="margin:0"><h2 style="margin:0">Relatório mensal</h2>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select id="relMes" aria-label="Mês do relatório" style="width:auto"></select><button class="btn" id="relPrint" type="button">Imprimir / salvar em PDF</button><button class="ghost" id="relCsv" type="button">Baixar planilha do mês</button></div></div>
+<p class="note" style="margin:8px 0 0">Resumo pronto para apresentar. Para gerar o PDF, clique em "Imprimir" e escolha "Salvar como PDF".</p>
+</div>
+<div id="relCorpo"></div>
 </section>
 </div>
 
@@ -431,6 +461,7 @@ function renderComp(){
     const tip=mesLongo(k)+(k===cur?" (em andamento)":"")+": "+m2(o.m)+" m², "+o.n+" refaç"+(o.n===1?"ão":"ões")+(temPreco?", "+brl(o.c):"")+(vr==null?"":" · "+(vr>0?"+":"")+Math.round(vr)+"% vs mês anterior");
     return `<button type="button" class="mc${k===mesSel?" on":""}" data-mes="${k}" title="${esc(tip)}" aria-label="${esc(tip)}. Clique para ver as refações." aria-pressed="${k===mesSel}"><span class="v">${fmt(v)}</span><span class="b" style="height:${h}px"></span><span class="l">${mesCurto(k).split("/")[0]}<i>/${k.slice(2,4)}</i></span></button>`}).join("");
   renderDet(d);
+  if(!$("aba-relatorio").hidden)renderRel();
 }
 async function renderDet(d){
   const box=$("cdet");
@@ -456,6 +487,97 @@ $("cgraf").onclick=e=>{
   const b=e.target.closest("[data-mes]");if(!b)return;
   mesSel=mesSel===b.dataset.mes?null:b.dataset.mes;renderComp();
   if(mesSel)setTimeout(()=>$("cdet").scrollIntoView({behavior:"smooth",block:"nearest"}),50);
+};
+// ---- Relatório mensal (para apresentar à diretoria) ----
+let relLista=[];
+function iniciaRel(){
+  const ms=ultimosMeses(12).reverse(),cur=hoje().slice(0,7);
+  $("relMes").innerHTML=ms.map(k=>`<option value="${k}">${esc(mesLongo(k))}${k===cur?" (em andamento)":""}</option>`).join("");
+  $("relMes").value=new Date().getDate()<=7?ms[1]:ms[0];
+}
+function refsJanela(){const cur=hoje().slice(0,7);return sb?histMes.concat(rows.filter(r=>(r.data||"").slice(0,7)===cur)):rows}
+function grupo(lista,fn){const g={};lista.forEach(r=>{const k=fn(r);g[k]=g[k]||{m:0,c:0,n:0};g[k].m+=num(r.metros);g[k].c+=custo(r);g[k].n++});return Object.entries(g).sort((a,b)=>b[1].m-a[1].m)}
+function barrasRel(ls,nomeFn,tot,temPreco){
+  const max=ls.length?ls[0][1].m:1;
+  return ls.length?ls.map(([id,v])=>`<div class="bar"><span>${esc(nomeFn(id))}</span><div class="track"><div class="fill" style="width:${max?v.m/max*100:0}%"></div></div><em>${m2(v.m)} m² · ${tot?Math.round(v.m/tot*100):0}%${temPreco?" · "+brl(v.c):""}</em></div>`).join(""):'<div class="empty">Sem registros.</div>';
+}
+function htmlRel(k,lista){
+  const cur=hoje().slice(0,7),d=dadosMes(),i=d.findIndex(x=>x[0]===k),prev=i>0?d[i-1][1]:null;
+  const mesAnt=i>0?MESES[+d[i-1][0].slice(5,7)-1]:"";
+  const temPreco=Object.values(prices).some(v=>num(v)>0),n=lista.length;
+  const agora=new Date().toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+  const cab=`<div class="card"><div class="rtit"><span>Extiminas</span> · Relatório mensal de refação</div><div class="sub">${esc(mesLongo(k))}${k===cur?" (parcial: mês em andamento)":""} · gerado em ${agora}</div></div>`;
+  if(!n)return cab+'<div class="card"><div class="empty">Nenhuma refação registrada neste mês.</div></div>';
+  const tot=lista.reduce((s,r)=>s+num(r.metros),0),cst=lista.reduce((s,r)=>s+custo(r),0);
+  const nref=x=>x+" refaç"+(x===1?"ão":"ões");
+  const vr=prev&&prev.m>0?pctVar(tot,prev.m):null;
+  const ant=[1,2,3].map(j=>d[i-j]).filter(Boolean).map(x=>x[1]).filter(o=>o.n>0);
+  const media3=ant.length?ant.reduce((s,o)=>s+o.m,0)/ant.length:null;
+  const ps=porSetor(lista),pm=grupo(lista,r=>r.mot||"Não informado");
+  const by={};lista.forEach(r=>partes(r).forEach(([id,c])=>{by[id]=by[id]||{m:0,c:0,n:0};by[id].m+=num(r.metros);by[id].c+=c;by[id].n++}));
+  const pmat=Object.entries(by).sort((a,b)=>b[1].m-a[1].m).slice(0,6);
+  // pontos de atenção
+  const al=[],jan=refsJanela();
+  if(vr!=null&&vr>=25)al.push(`A área perdida <b>subiu ${Math.round(vr)}%</b> em relação a ${esc(mesAnt)} (${m2(prev.m)} m² para ${m2(tot)} m²).`);
+  if(media3!=null&&tot>=1.3*media3&&tot-media3>=1)al.push(`O mês está <b>acima da média dos últimos meses</b> (média de ${m2(media3)} m²).`);
+  ps.forEach(([id,v])=>{
+    const ms3=[1,2,3].map(j=>d[i-j]&&d[i-j][0]).filter(Boolean);
+    const tem=ms3.filter(mk=>jan.some(r=>(r.data||"").slice(0,7)===mk)).length;
+    const soma=ms3.reduce((s,mk)=>s+jan.filter(r=>(r.data||"").slice(0,7)===mk&&(r.setor||"sem")===id).reduce((a,r)=>a+num(r.metros),0),0);
+    const med=tem?soma/tem:0;
+    if(med>0&&v.m>=1.5*med&&v.m-med>=1)al.push(`<b>${esc(nomeSetor(id))}</b> perdeu ${m2(v.m)} m², cerca de ${Math.round(v.m/med*100-100)}% acima da própria média dos meses anteriores (${m2(med)} m²).`);
+  });
+  if(n>=5&&tot>0&&ps[0][1].m/tot>=0.4)al.push(`<b>${esc(nomeSetor(ps[0][0]))}</b> concentra ${Math.round(ps[0][1].m/tot*100)}% da área perdida do mês.`);
+  if(n>=5&&pm[0][1].n/n>=0.4)al.push(`${Math.round(pm[0][1].n/n*100)}% das refações têm o mesmo motivo: <b>${esc(pm[0][0])}</b>.`);
+  // Repetição = mesmo pedido E mesmo layout (vários layouts no mesmo pedido são normais).
+  const chave=r=>String(r.ped||"").trim()+"|"+String(r.lay||"").trim().toLowerCase();
+  const pd={};lista.forEach(r=>{if(!String(r.ped||"").trim())return;const c=chave(r);pd[c]=pd[c]||{n:0,m:0,ped:String(r.ped).trim(),lay:String(r.lay||"").trim()};pd[c].n++;pd[c].m+=num(r.metros)});
+  Object.values(pd).filter(v=>v.n>=2).sort((a,b)=>b.n-a.n).slice(0,5).forEach(v=>al.push(`O pedido <b>${esc(v.ped)}</b>${v.lay?", layout <b>"+esc(v.lay)+"</b>,":""} teve refação <b>${v.n} vezes</b> no mês (${m2(v.m)} m²). Vale investigar a causa.`));
+  const base=jan.map(r=>num(r.metros)).filter(x=>x>0);
+  const medB=base.length>=8?base.reduce((a,b)=>a+b,0)/base.length:null,lim=medB?2*medB:null;
+  const fora=lim?lista.filter(r=>num(r.metros)>lim):[];
+  if(fora.length)al.push(`<b>${nref(fora.length)}</b> ${fora.length===1?"ficou":"ficaram"} acima do padrão (mais de 2 vezes a média de ${m2(medB)} m² por refação).`);
+  const grandes=lista.slice().sort((a,b)=>num(b.metros)-num(a.metros)).slice(0,5);
+  const sit=r=>{const s=[];if(lim&&num(r.metros)>lim)s.push("Acima do padrão");const p=pd[chave(r)];if(p&&p.n>=2)s.push("Mesmo layout repetido ("+p.n+"×)");return s.length?s.map(x=>`<span class="tag alert">${x}</span>`).join(" "):"—"};
+  const marcada=r=>(lim&&num(r.metros)>lim)||(pd[chave(r)]||{n:0}).n>=2;
+  const tabela=[...new Set(lista.filter(marcada).concat(grandes))].sort((a,b)=>(marcada(b)-marcada(a))||num(b.metros)-num(a.metros)).slice(0,12);
+  const resumo=[`Em <b>${esc(mesLongo(k))}</b> foram registradas <b>${nref(n)}</b>, somando <b>${m2(tot)} m²</b> de material perdido${temPreco?` (custo estimado de <b>${brl(cst)}</b>)`:""}.`];
+  if(vr!=null)resumo.push(`Em relação a ${esc(mesAnt)}, a perda ${vr>0?"subiu":vr<0?"caiu":"ficou igual"}${Math.round(vr)?" "+Math.abs(Math.round(vr))+"%":""}.`);
+  resumo.push(`O setor com mais perda foi <b>${esc(nomeSetor(ps[0][0]))}</b> (${m2(ps[0][1].m)} m², ${tot?Math.round(ps[0][1].m/tot*100):0}%) e o motivo mais frequente foi <b>${esc(pm.slice().sort((a,b)=>b[1].n-a[1].n)[0][0])}</b>.`);
+  const maxM=Math.max(0,...d.map(x=>x[1].m));
+  const evol=`<div class="cgx" role="img" aria-label="Área perdida nos últimos 12 meses">${d.map(([mk,o])=>{const h=maxM&&o.m>0?Math.max(3,Math.round(o.m/maxM*130)):0;return `<div class="mc${mk===k?" on":""}"><span class="v">${m2(o.m)}</span><span class="b" style="height:${h}px"></span><span class="l">${mesCurto(mk).split("/")[0]}<i>/${mk.slice(2,4)}</i></span></div>`}).join("")}</div>`;
+  const linha=r=>`<tr><td>${esc((r.data||"").split("-").reverse().join("/"))}</td><td><b>${esc(r.ped||"—")}</b></td><td>${esc(nomeSetor(r.setor||"sem"))}</td><td>${comps(r).map(id=>esc(nome(id))).join(" + ")||"—"}</td><td>${m2(r.metros)}</td><td>${esc(r.mot||"—")}</td><td>${temPreco?brl(custo(r)):"—"}</td><td>${sit(r)}</td></tr>`;
+  return cab+
+   `<div class="kpis"><div class="kpi main"><small>Área perdida</small><b>${m2(tot)} m²</b><small>${vr==null?"":(vr>0?"▲ ":vr<0?"▼ ":"")+Math.abs(Math.round(vr))+"% vs "+esc(mesAnt)}</small></div><div class="kpi"><small>Refações</small><b>${n}</b></div><div class="kpi"><small>Custo estimado</small><b>${temPreco?brl(cst):"—"}</b></div><div class="kpi"><small>Média por refação</small><b>${m2(tot/n)} m²</b></div></div>`+
+   `<div class="card"><h2>Resumo</h2><ul class="rsum">${resumo.map(x=>`<li>${x}</li>`).join("")}</ul></div>`+
+   `<div class="card"><h2>Pontos de atenção</h2>${al.length?`<ul class="al">${al.map(x=>`<li>⚠ ${x}</li>`).join("")}</ul>`:'<p class="ok-msg">Nenhum ponto fora do padrão identificado neste mês.</p>'}</div>`+
+   `<div class="card"><h2>Refações para tratar e maiores do mês</h2><div class="scroll"><table><thead><tr><th>Data</th><th>Pedido</th><th>Setor</th><th>Material</th><th>m²</th><th>Motivo</th><th>Custo</th><th>Situação</th></tr></thead><tbody>${tabela.map(linha).join("")}</tbody></table></div><p class="note">Primeiro as refações sinalizadas (acima do padrão ou de mesmo layout repetido), depois as maiores do mês. Máximo de 12 linhas.</p></div>`+
+   `<div class="card"><h2>Perda por setor</h2>${barrasRel(ps,nomeSetor,tot,temPreco)}</div>`+
+   `<div class="card"><h2>Motivos das refações</h2>${barrasRel(pm,x=>x,tot,temPreco)}</div>`+
+   `<div class="card"><h2>Materiais mais perdidos</h2>${barrasRel(pmat,nome,tot,temPreco)}<p class="note">Uma refação com base e filme conta nos dois materiais.</p></div>`+
+   `<div class="card"><h2>Evolução nos últimos 12 meses (m²)</h2>${evol}</div>`+
+   `<p class="note">Critérios dos pontos de atenção: variação acima de 25% sobre o mês anterior; setor com perda 50% acima da própria média dos 3 meses anteriores; setor ou motivo com 40% ou mais do total; mesmo pedido e mesmo layout com 2 ou mais refações no mês (layouts diferentes do mesmo pedido não contam); refação com mais de 2 vezes a média de área (só avaliada quando há ao menos 8 registros no histórico).</p>`;
+}
+async function renderRel(){
+  if(!gestor||!$("relMes").value)return;
+  const k=$("relMes").value,box=$("relCorpo"),cur=hoje().slice(0,7);let lista;
+  if(sb&&!mesesOk){box.innerHTML='<div class="empty">Carregando…</div>';return}
+  if(k===cur||!sb)lista=rows.filter(r=>(r.data||"").slice(0,7)===k);
+  else if(detCache[k])lista=detCache[k];
+  else{
+    box.innerHTML='<div class="empty">Montando o relatório…</div>';
+    try{lista=detCache[k]=await buscarMes(k)}catch(e){console.error(e);box.innerHTML='<div class="empty">Não foi possível carregar este mês.</div>';return}
+    if($("relMes").value!==k)return;
+  }
+  relLista=lista;box.innerHTML=htmlRel(k,lista);
+}
+$("relMes").onchange=renderRel;
+$("relPrint").onclick=()=>window.print();
+$("relCsv").onclick=()=>{
+  if(!relLista.length)return;
+  const blob=new Blob([csv(relLista)],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download="refacoes-extiminas-"+$("relMes").value+".csv";document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500);
 };
 $("hist").onclick=async e=>{
   const id=e.target.dataset&&e.target.dataset.del;if(!id)return;
@@ -548,6 +670,7 @@ function papel(){
   if(gestor){$("fold").hidden=false;let v="1";try{v=localStorage.getItem("fmin")??"1"}catch(e){}dobra(v==="1")}else{$("fold").hidden=true;$("fcard").classList.remove("min")}
   $("role").textContent=gestor?"Gestor":"Usuário";$("role").className="role"+(gestor?" g":"");
   $("painel").hidden=!gestor;
+  $("abaRel").hidden=!gestor;if(gestor&&!$("relMes").options.length)iniciaRel();
 }
 const cfg=window.APP_CONFIG||{};
 const configurado=!!(window.supabase&&cfg.url&&cfg.anonKey&&!/COLE_/.test(cfg.url+cfg.anonKey));
@@ -586,9 +709,10 @@ async function carregarConfig(){
 // Abas do sistema: cada botão .aba[data-aba="x"] mostra a seção #aba-x.
 function abrirAba(id){
   const bt=[...document.querySelectorAll(".aba")],pg=[...document.querySelectorAll(".aba-pg")];
-  if(!pg.some(p=>p.id==="aba-"+id))id="refacao";
+  if(!pg.some(p=>p.id==="aba-"+id)||(id==="relatorio"&&!gestor))id="refacao";
   bt.forEach(b=>{const on=b.dataset.aba===id;b.classList.toggle("on",on);if(on)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current")});
   pg.forEach(p=>{p.hidden=p.id!=="aba-"+id});
+  if(id==="relatorio")renderRel();
 }
 document.querySelectorAll(".aba").forEach(b=>b.onclick=()=>{abrirAba(b.dataset.aba);history.replaceState(null,"","#"+b.dataset.aba)});
 window.addEventListener("hashchange",()=>{if(!TV)abrirAba(location.hash.slice(1))});
