@@ -1,14 +1,16 @@
-# Extiminas · Controle de Refação
+# Extiminas · Sistema interno
 
-Registro de perdas de insumos (refação) da comunicação visual, com painel de custos para o gestor e modo TV.
+Abas do site: **Refação** (registro de perdas de insumos, painel de custos e modo TV) e **Tintas** (estoque de frascos de tinta por máquina, com validade).
 
 - **Site:** HTML puro (sem build), publicado no **GitHub Pages**
 - **Dados e login:** **Supabase** (Postgres + Auth + Realtime)
 
 ```
-index.html                  # o aplicativo inteiro
+index.html                  # o site (abas) e a aba Refação
+tintas.html                 # a aba Tintas (abre dentro do index.html)
 config.js                   # URL e chave pública do Supabase (você preenche)
 supabase/schema.sql         # tabelas, login e regras de acesso (rodar 1x)
+supabase/tintas.sql         # tabelas e regras da aba Tintas (rodar 1x, depois do schema.sql)
 ```
 
 ## Quem pode o quê
@@ -22,6 +24,24 @@ supabase/schema.sql         # tabelas, login e regras de acesso (rodar 1x)
 Essas regras ficam **no banco** (Row Level Security), não só na tela: mesmo quem
 abrir o console do navegador não consegue ler preços nem o histórico sem ser gestor.
 
+### Aba Tintas
+
+| Quem | Painel (ver saldos, retirar, entrada, contagem, marcar compra) | Histórico | Configurar (máquinas, cores, regras) |
+|------|:-:|:-:|:-:|
+| `gestor` | ✅ | ✅ | ✅ |
+| usuário com `perfis.tintas = true` (`impressao@extiminas.com`) | ✅ | ❌ | ❌ |
+| qualquer outro usuário | ❌ (a aba nem aparece) | ❌ | ❌ |
+
+Quem só tem acesso ao painel não lê o histórico nem altera máquinas/cores/regras: as
+movimentações entram por funções do banco (`tinta_mover`, `tinta_comprado`), que conferem a
+permissão e o saldo no servidor. Para liberar outra conta, troque o e-mail na última linha de
+`supabase/tintas.sql` e rode só ela:
+
+```sql
+update public.perfis set tintas = true
+ where id = (select id from auth.users where lower(email) = 'OUTRO_EMAIL_AQUI');
+```
+
 ---
 
 ## Passo a passo
@@ -32,6 +52,11 @@ abrir o console do navegador não consegue ler preços nem o histórico sem ser 
    **desligue "Allow new users to sign up"** (assim só entra quem você convidar).
    Em **Confirm email**, pode desligar para simplificar.
 3. Em **SQL Editor → New query**, cole o conteúdo de `supabase/schema.sql` e clique **Run**.
+
+### 1b. Ativar a aba Tintas
+No **SQL Editor**, rode `supabase/tintas.sql`. (Os saldos e o histórico iniciais não ficam no repositório, que é público: foram importados direto no Supabase.)
+(O usuário `impressao@extiminas.com` precisa já existir em Authentication; se for criado depois,
+rode de novo a última linha do `tintas.sql`.)
 
 ### 2. Criar os usuários
 Em **Authentication → Users → Add user → Create new user**, crie:
